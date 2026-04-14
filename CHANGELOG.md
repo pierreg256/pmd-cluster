@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-14
+
+### Added
+
+- Refactored app into testable modules (`pmd-client.ts`, `app.ts`, `index.ts`)
+- PMD socket client with typed interfaces (`PmdStatus`, `PmdNode`, `PmdService`)
+- 14 unit tests with mock socket server (Node.js built-in test runner)
+- 4 integration tests against a real local PMD daemon
+- `tsx` for running TypeScript tests directly
+- `npm test`, `npm run test:unit`, `npm run test:integration` scripts
+- ESM module support (`"type": "module"`)
+
+### Changed
+
+- `pmd-client` functions now take `PmdClientOptions` (configurable socket path)
+- `createApp()` factory for testable HTTP server instantiation
+- Version bump 0.1.0 → 0.2.0
+
 ## [0.1.0] - 2026-04-14
 
 ### Added
