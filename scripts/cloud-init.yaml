@@ -1,0 +1,181 @@
+#cloud-config
+
+package_update: true
+
+packages:
+  - jq
+  - curl
+  - build-essential
+  - pkg-config
+  - libssl-dev
+
+write_files:
+  # PMD configuration
+  - path: /etc/pmd/config.toml
+    permissions: "0644"
+    content: |
+      ${indent(6, pmd_config)}
+
+  # systemd unit file (based on upstream contrib/pmd.service)
+  - path: /etc/systemd/system/pmd.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=PMD — Port Mapper Daemon (distributed node membership)
+      Documentation=https://github.com/pierreg256/pmd
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=notify
+      ExecStart=/usr/local/bin/pmd start --foreground --config /etc/pmd/config.toml
+      ExecStop=/usr/local/bin/pmd stop
+      Restart=on-failure
+      RestartSec=5s
+
+      # Security hardening
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=read-only
+      ReadWritePaths=/var/lib/pmd
+      PrivateTmp=true
+
+      # Environment
+      Environment=RUST_LOG=info
+      Environment=HOME=/var/lib/pmd
+      StateDirectory=pmd
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Script to fetch cookie from Key Vault via managed identity
+  - path: /usr/local/bin/pmd-fetch-cookie.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      VAULT_NAME="${keyvault_name}"
+      SECRET_NAME="pmd-cookie"
+      COOKIE_DIR="/var/lib/pmd/.pmd"
+      COOKIE_PATH="$COOKIE_DIR/cookie"
+
+      mkdir -p "$COOKIE_DIR"
+
+      # Get OAuth token from IMDS using managed identity
+      TOKEN=$(curl -s -H "Metadata: true" \
+        "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net" \
+        | jq -r '.access_token')
+
+      # Fetch the secret value from Key Vault
+      COOKIE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+        "https://$VAULT_NAME.vault.azure.net/secrets/$SECRET_NAME?api-version=7.4" \
+        | jq -r '.value')
+
+      # Write cookie file with restricted permissions
+      echo -n "$COOKIE" > "$COOKIE_PATH"
+      chmod 600 "$COOKIE_PATH"
+
+      echo "PMD cookie retrieved successfully from Key Vault"
+
+  # TypeScript API — source files
+  - path: /opt/pmd-api/src/index.ts
+    permissions: "0644"
+    content: |
+      ${indent(6, app_source)}
+
+  - path: /opt/pmd-api/package.json
+    permissions: "0644"
+    content: |
+      ${indent(6, app_package_json)}
+
+  - path: /opt/pmd-api/tsconfig.json
+    permissions: "0644"
+    content: |
+      ${indent(6, app_tsconfig)}
+
+  # systemd unit for the API service
+  - path: /etc/systemd/system/pmd-api.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=PMD API Service
+      After=network-online.target pmd.service
+      Wants=network-online.target
+      Requires=pmd.service
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/bin/node /opt/pmd-api/dist/index.js
+      Restart=on-failure
+      RestartSec=5s
+      Environment=NODE_ENV=production
+      EnvironmentFile=/etc/pmd-api/env
+      WorkingDirectory=/opt/pmd-api
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # Install Rust toolchain and build PMD from crates.io
+  - |
+    set -ex
+    export HOME=/root
+    export CARGO_HOME=/root/.cargo
+    export RUSTUP_HOME=/root/.rustup
+    # Clean any partial previous install
+    rm -rf "$CARGO_HOME" "$RUSTUP_HOME"
+    # Install rustup (minimal profile to speed up)
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+    . "$CARGO_HOME/env"
+    echo "Rust installed: $(rustc --version)"
+    # Build and install portmapd
+    cargo install portmapd --version "${pmd_version_bare}"
+    cp "$CARGO_HOME/bin/pmd" /usr/local/bin/pmd
+    chmod +x /usr/local/bin/pmd
+    echo "PMD ${pmd_version_bare} installed successfully at /usr/local/bin/pmd"
+
+  # Create state directory (including .pmd for cookie/socket/tls)
+  - mkdir -p /var/lib/pmd/.pmd
+
+  # Fetch the cookie from Key Vault
+  - /usr/local/bin/pmd-fetch-cookie.sh
+
+  # Resolve private IP from IMDS and inject into PMD config
+  - |
+    PRIVATE_IP=$(curl -s -H "Metadata: true" \
+      "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
+    echo "Detected private IP: $PRIVATE_IP"
+    sed -i "s/BIND_ADDR/$PRIVATE_IP/" /etc/pmd/config.toml
+
+  # Enable and start PMD
+  - systemctl daemon-reload
+  - systemctl enable pmd.service
+  - systemctl start pmd.service
+
+  # Install Node.js 20 LTS
+  - |
+    set -ex
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+    echo "Node.js installed: $(node --version)"
+
+  # Build the TypeScript API
+  - |
+    set -ex
+    cd /opt/pmd-api
+    npm install
+    npx tsc
+    echo "API compiled successfully"
+
+  # Write environment file with private IP for API bind address
+  - |
+    mkdir -p /etc/pmd-api
+    PRIVATE_IP=$(curl -s -H "Metadata: true" \
+      "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
+    echo "BIND_ADDR=$PRIVATE_IP" > /etc/pmd-api/env
+    echo "API will bind on $PRIVATE_IP:8080"
+
+  # Enable and start the API service
+  - systemctl enable pmd-api.service
+  - systemctl start pmd-api.service

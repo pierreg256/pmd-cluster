@@ -1,0 +1,30 @@
+# Azure region
+location = "westeurope"
+
+# Resource group name
+resource_group_name = "rg-pmd-cluster"
+
+# VM size — Standard_B2s is sufficient for PMD daemon
+vm_size = "Standard_B2s"
+
+# VMSS instance count
+vmss_min_instances = 3
+vmss_max_instances = 10
+
+# VM admin user
+admin_username = "azureuser"
+
+# Path to your SSH public key
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# PMD cluster tag value — all VMs with this tag auto-discover each other
+pmd_cluster_tag_value = "prod"
+
+# PMD version (GitHub Release tag)
+pmd_version = "v0.5.0"
+
+# Restrict SSH to your IP (replace with your actual IP/32)
+admin_ssh_cidr = "0.0.0.0/0"
+
+# Additional tags
+tags = {}
