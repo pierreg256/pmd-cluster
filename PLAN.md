@@ -155,7 +155,7 @@ graph TD
 - [ ] Integration tests against local PMD instance
 - [ ] CI pipeline (GitHub Actions)
 
-### Phase 6 — Distributed State with Concordat WASM
+### Phase 6 — Distributed State with Concordat WASM ✅
 
 Integrate `concordat` (v0.2.0) WASM module to give each node a local CRDT replica that converges automatically across the ring.
 
@@ -212,10 +212,10 @@ npm install concordat    # pre-built WASM from npm (wasm-pack --target nodejs)
 ```
 
 - [x] Design state schema (this section)
-- [ ] Add `concordat` WASM dependency to `package.json`
-- [ ] Implement `RingState` class (`app/src/state.ts`)
-- [ ] Implement ring topology helpers (`app/src/ring.ts`)
-- [ ] Unit tests for state mutations and ring ordering
+- [x] Add `concordat` WASM dependency to `package.json`
+- [x] Implement `RingState` class (`app/src/state.ts`)
+- [x] Implement ring topology helpers (`app/src/ring.ts`)
+- [x] Unit tests for state mutations and ring ordering
 
 ---
 
