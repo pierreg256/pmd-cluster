@@ -5,7 +5,7 @@ import { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { unlinkSync } from "node:fs";
-import { createApp } from "./app.js";
+import { createApp } from "../../src/app.js";
 
 // ---------------------------------------------------------------------------
 // Helper: mock PMD socket + HTTP test client

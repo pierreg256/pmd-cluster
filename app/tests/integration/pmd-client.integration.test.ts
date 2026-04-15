@@ -12,7 +12,7 @@ import {
   pmdUnregister,
   PmdStatus,
   PmdNode,
-} from "./pmd-client.js";
+} from "../../src/pmd-client.js";
 
 // ---------------------------------------------------------------------------
 // Integration test: real PMD daemon

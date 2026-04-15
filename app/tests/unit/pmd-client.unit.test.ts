@@ -10,7 +10,7 @@ import {
   getPmdNodes,
   pmdRegister,
   pmdUnregister,
-} from "./pmd-client.js";
+} from "../../src/pmd-client.js";
 
 // ---------------------------------------------------------------------------
 // Helper: mock PMD socket server
