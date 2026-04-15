@@ -7,7 +7,9 @@ locals {
   pmd_version_bare = trimprefix(var.pmd_version, "v")
 
   # App source files (read as raw strings, not template-processed)
-  app_source       = file("${path.module}/../app/src/index.ts")
+  app_index_ts     = file("${path.module}/../app/src/index.ts")
+  app_app_ts       = file("${path.module}/../app/src/app.ts")
+  app_pmd_client   = file("${path.module}/../app/src/pmd-client.ts")
   app_package_json = file("${path.module}/../app/package.json")
   app_tsconfig     = file("${path.module}/../app/tsconfig.json")
 
@@ -16,7 +18,9 @@ locals {
     keyvault_name    = azurerm_key_vault.this.name
     pmd_version      = var.pmd_version
     pmd_version_bare = local.pmd_version_bare
-    app_source       = local.app_source
+    app_index_ts     = local.app_index_ts
+    app_app_ts       = local.app_app_ts
+    app_pmd_client   = local.app_pmd_client
     app_package_json = local.app_package_json
     app_tsconfig     = local.app_tsconfig
   })

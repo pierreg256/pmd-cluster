@@ -82,7 +82,17 @@ write_files:
   - path: /opt/pmd-api/src/index.ts
     permissions: "0644"
     content: |
-      ${indent(6, app_source)}
+      ${indent(6, app_index_ts)}
+
+  - path: /opt/pmd-api/src/app.ts
+    permissions: "0644"
+    content: |
+      ${indent(6, app_app_ts)}
+
+  - path: /opt/pmd-api/src/pmd-client.ts
+    permissions: "0644"
+    content: |
+      ${indent(6, app_pmd_client)}
 
   - path: /opt/pmd-api/package.json
     permissions: "0644"
