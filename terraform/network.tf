@@ -7,17 +7,6 @@ resource "azurerm_virtual_network" "this" {
   tags = azurerm_resource_group.this.tags
 }
 
-# Public IP prefix (Standard SKU) for VMSS instance public IPs
-resource "azurerm_public_ip_prefix" "pmd_instances" {
-  name                = "pippfx-pmd-instances"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  prefix_length       = 28 # 16 IPs — enough for up to 10 instances
-  sku                 = "Standard"
-
-  tags = azurerm_resource_group.this.tags
-}
-
 resource "azurerm_subnet" "pmd" {
   name                            = "snet-pmd"
   resource_group_name             = azurerm_resource_group.this.name
@@ -36,6 +25,10 @@ resource "azurerm_public_ip" "nat" {
   sku                 = "Standard"
 
   tags = azurerm_resource_group.this.tags
+
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 
 resource "azurerm_nat_gateway" "this" {
@@ -101,17 +94,17 @@ resource "azurerm_network_security_group" "pmd" {
     destination_address_prefix = "10.0.1.0/24"
   }
 
-  # SSH access — restricted to admin CIDR
+  # SSH access — from Azure Bastion subnet only
   security_rule {
-    name                       = "AllowSSH"
+    name                       = "AllowSSHFromBastion"
     priority                   = 200
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
-    source_address_prefix      = var.admin_ssh_cidr
-    destination_address_prefix = "*"
+    source_address_prefix      = "10.0.2.0/26"
+    destination_address_prefix = "10.0.1.0/24"
   }
 
   tags = azurerm_resource_group.this.tags
@@ -120,4 +113,39 @@ resource "azurerm_network_security_group" "pmd" {
 resource "azurerm_subnet_network_security_group_association" "pmd" {
   subnet_id                 = azurerm_subnet.pmd.id
   network_security_group_id = azurerm_network_security_group.pmd.id
+}
+
+# --- Azure Bastion ---
+
+resource "azurerm_subnet" "bastion" {
+  name                 = "AzureBastionSubnet"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["10.0.2.0/26"]
+}
+
+resource "azurerm_public_ip" "bastion" {
+  name                = "pip-bastion-pmd"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+
+  tags = azurerm_resource_group.this.tags
+}
+
+resource "azurerm_bastion_host" "this" {
+  name                = "bastion-pmd-cluster"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  sku                 = "Standard"
+  tunneling_enabled   = true
+
+  ip_configuration {
+    name                 = "bastion-ipconfig"
+    subnet_id            = azurerm_subnet.bastion.id
+    public_ip_address_id = azurerm_public_ip.bastion.id
+  }
+
+  tags = azurerm_resource_group.this.tags
 }

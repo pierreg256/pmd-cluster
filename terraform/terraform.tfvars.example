@@ -23,8 +23,5 @@ pmd_cluster_tag_value = "prod"
 # PMD version (GitHub Release tag)
 pmd_version = "v0.5.0"
 
-# Restrict SSH to your IP (replace with your actual IP/32)
-admin_ssh_cidr = "0.0.0.0/0"
-
 # Additional tags
 tags = {}

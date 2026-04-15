@@ -6,7 +6,10 @@ Distributed [portmapd](https://crates.io/crates/portmapd) mesh cluster running o
 
 ```mermaid
 graph TD
-    subgraph VMSS["Azure VMSS (Flexible)"]
+    LB["🔀 Load Balancer<br/>:80 → :8080"]
+    Bastion["🛡️ Azure Bastion<br/>SSH tunneling"]
+
+    subgraph VMSS["Azure VMSS (Flexible) — private IPs only"]
         subgraph VM0["VM 0"]
             PMD0["pmd :4369"]
         end
@@ -21,6 +24,14 @@ graph TD
         PMD1 <-->|mesh| PMD2
         PMD0 <-->|mesh| PMD2
     end
+
+    LB -->|:8080| VM0
+    LB -->|:8080| VM1
+    LB -->|:8080| VM2
+
+    Bastion -->|SSH :22| VM0
+    Bastion -->|SSH :22| VM1
+    Bastion -->|SSH :22| VM2
 
     ARG["Azure Resource Graph<br/>tag: pmd-cluster=prod"]
     PMD0 -.->|discovery| ARG
@@ -53,7 +64,7 @@ cd terraform
 
 # Copy and edit variables
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars — at minimum set admin_ssh_cidr to your IP/32
+# Edit terraform.tfvars if needed (region, VM size, etc.)
 
 # Deploy
 terraform init
@@ -64,14 +75,20 @@ terraform apply
 ## Verify the Cluster
 
 ```bash
-# Get VMSS instance IPs
-az vmss list-instance-public-ips \
+# Get VMSS instance private IPs
+az vmss nic list \
   -g rg-pmd-cluster \
-  -n vmss-pmd-cluster \
-  --query '[].ipAddress' -o tsv
+  --vmss-name vmss-pmd-cluster \
+  --query '[].ipConfigurations[0].privateIPAddress' -o tsv
 
-# SSH to any instance
-ssh azureuser@<IP>
+# SSH via Azure Bastion tunnel (native client)
+az network bastion ssh \
+  -n bastion-pmd-cluster \
+  -g rg-pmd-cluster \
+  --target-resource-id <VM_RESOURCE_ID> \
+  --auth-type ssh-key \
+  --username azureuser \
+  --ssh-key ~/.ssh/id_rsa
 
 # On the VM — check PMD status
 systemctl status pmd
@@ -86,8 +103,12 @@ pmd nodes    # Should list all 3 nodes
 az vmss scale -g rg-pmd-cluster -n vmss-pmd-cluster --new-capacity 5
 
 # New VMs will auto-join the cluster within ~30s (azure-tag polling interval)
-# Verify from any existing node:
-ssh azureuser@<IP> "pmd nodes"
+# Verify from any existing node via Bastion:
+az network bastion ssh \
+  -n bastion-pmd-cluster -g rg-pmd-cluster \
+  --target-resource-id <VM_RESOURCE_ID> \
+  --auth-type ssh-key --username azureuser --ssh-key ~/.ssh/id_rsa \
+  -- -t "pmd nodes"
 ```
 
 ## Configuration
@@ -112,14 +133,14 @@ ssh azureuser@<IP> "pmd nodes"
 | `vmss_min_instances` | 3 | Initial instance count |
 | `pmd_cluster_tag_value` | `prod` | Tag value for discovery |
 | `pmd_version` | `v0.5.0` | PMD release version |
-| `admin_ssh_cidr` | `0.0.0.0/0` | SSH access CIDR (restrict this!) |
 
 ## Security
 
+- **Azure Bastion**: SSH access via Bastion tunnel only — no public IPs on VMs
 - **Cookie auth**: All nodes share a 32-byte HMAC cookie stored in Key Vault
 - **mTLS**: Inter-node TLS with auto-generated certificates
 - **Managed Identity**: VMs use user-assigned MI — no credentials stored on disk
-- **NSG**: Port 4369 restricted to subnet-internal traffic only
+- **NSG**: Port 4369 restricted to subnet-internal traffic; SSH restricted to Bastion subnet
 - **systemd hardening**: `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`
 
 ## Cleanup

@@ -9,6 +9,7 @@ Distributed [portmapd](https://crates.io/crates/portmapd) mesh cluster running o
 ```mermaid
 graph TD
     LB["🔀 Load Balancer<br/>:80 → :8080"]
+    Bastion["🛡️ Azure Bastion<br/>SSH tunneling"]
 
     subgraph VM0["VM 0 — 10.0.1.4"]
         EXT0["External API<br/>:8080 HTTP/1.1"]
@@ -44,6 +45,10 @@ graph TD
     LB --> EXT1
     LB --> EXT2
 
+    Bastion -->|SSH :22| VM0
+    Bastion -->|SSH :22| VM1
+    Bastion -->|SSH :22| VM2
+
     INT0 <-->|gossip :9443| INT1
     INT1 <-->|gossip :9443| INT2
     INT0 <-->|gossip :9443| INT2
@@ -62,7 +67,7 @@ graph TD
     KV -.-> MI
 ```
 
-> **Ports:** `:8080` External = public HTTP/1.1 API (via LB) · `:9443` Internal = node-to-node gossip (subnet only, HMAC-auth) · `:4369` PMD = membership & failure detection
+> **Ports:** `:8080` External = public HTTP/1.1 API (via LB) · `:9443` Internal = node-to-node gossip (subnet only, HMAC-auth) · `:4369` PMD = membership & failure detection · `:22` SSH via Azure Bastion only
 
 ## Components
 
@@ -72,12 +77,12 @@ graph TD
 |------|---------|
 | `main.tf` | Provider azurerm ~> 4.0, resource group |
 | `variables.tf` | All configurable variables |
-| `network.tf` | VNet, subnet, NSG, NAT Gateway, Public IP Prefix |
+| `network.tf` | VNet, subnets, NSG, NAT Gateway, Azure Bastion |
 | `identity.tf` | User-assigned managed identity + RBAC |
 | `keyvault.tf` | Key Vault + pmd-cookie secret |
 | `loadbalancer.tf` | Standard LB, health probe, rule :80→:8080 |
-| `vmss.tf` | Flexible VMSS, cloud-init, LB backend pool |
-| `outputs.tf` | Resource IDs, LB public IP |
+| `vmss.tf` | Flexible VMSS (private IPs only), cloud-init, LB backend pool |
+| `outputs.tf` | Resource IDs, LB public IP, Bastion name |
 
 ### Application (`app/`)
 
@@ -109,7 +114,7 @@ graph TD
 - [x] Terraform project structure (provider, RG, variables)
 - [x] Networking (VNet, subnet, NSG port 4369/9090/22/8080)
 - [x] NAT Gateway for explicit outbound
-- [x] Per-instance public IPs (Standard SKU via Public IP Prefix)
+- [x] Azure Bastion for SSH access (no public IPs on VMs)
 - [x] Key Vault + random cookie secret
 - [x] User-assigned managed identity (Reader RG + KV Secrets User)
 

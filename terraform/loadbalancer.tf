@@ -6,6 +6,10 @@ resource "azurerm_public_ip" "lb" {
   sku                 = "Standard"
 
   tags = azurerm_resource_group.this.tags
+
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 
 resource "azurerm_lb" "this" {

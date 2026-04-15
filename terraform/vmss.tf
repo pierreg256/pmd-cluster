@@ -73,12 +73,6 @@ resource "azurerm_orchestrated_virtual_machine_scale_set" "pmd" {
       subnet_id = azurerm_subnet.pmd.id
 
       load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.this.id]
-
-      public_ip_address {
-        name                    = "pip-pmd-instance"
-        public_ip_prefix_id     = azurerm_public_ip_prefix.pmd_instances.id
-        sku_name                = "Standard_Regional"
-      }
     }
   }
 

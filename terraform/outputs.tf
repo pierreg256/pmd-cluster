@@ -42,3 +42,8 @@ output "lb_public_ip" {
   description = "Public IP of the Load Balancer (API endpoint)"
   value       = azurerm_public_ip.lb.ip_address
 }
+
+output "bastion_name" {
+  description = "Name of the Azure Bastion host (use for SSH tunneling)"
+  value       = azurerm_bastion_host.this.name
+}
