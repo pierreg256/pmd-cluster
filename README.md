@@ -11,23 +11,33 @@ graph TD
 
     subgraph VMSS["Azure VMSS (Flexible) — private IPs only"]
         subgraph VM0["VM 0"]
-            PMD0["pmd :4369"]
+            NODE0["Node (TS) :8080"]
+            PMD0["PMD :4369"]
+            NODE0 -->|Unix socket| PMD0
         end
         subgraph VM1["VM 1"]
-            PMD1["pmd :4369"]
+            NODE1["Node (TS) :8080"]
+            PMD1["PMD :4369"]
+            NODE1 -->|Unix socket| PMD1
         end
         subgraph VM2["VM 2"]
-            PMD2["pmd :4369"]
+            NODE2["Node (TS) :8080"]
+            PMD2["PMD :4369"]
+            NODE2 -->|Unix socket| PMD2
         end
 
-        PMD0 <-->|mesh| PMD1
-        PMD1 <-->|mesh| PMD2
-        PMD0 <-->|mesh| PMD2
+        NODE0 <-->|ring :9443| NODE1
+        NODE1 <-->|ring :9443| NODE2
+        NODE0 <-->|ring :9443| NODE2
+
+        PMD0 <-->|mesh :4369| PMD1
+        PMD1 <-->|mesh :4369| PMD2
+        PMD0 <-->|mesh :4369| PMD2
     end
 
-    LB -->|:8080| VM0
-    LB -->|:8080| VM1
-    LB -->|:8080| VM2
+    LB -->|:8080| NODE0
+    LB -->|:8080| NODE1
+    LB -->|:8080| NODE2
 
     Bastion -->|SSH :22| VM0
     Bastion -->|SSH :22| VM1
@@ -39,17 +49,14 @@ graph TD
     PMD2 -.->|discovery| ARG
 
     KV["🔑 Key Vault<br/>pmd-cookie"]
-    MI["🪪 Managed Identity<br/>Reader + KV Secrets"]
+    MI["🪪 Managed Identity<br/>Reader + KV User"]
     KV -.-> MI
     MI -.-> VMSS
 ```
 
-Each VM at boot:
-1. Downloads the `pmd` binary from GitHub Releases
-2. Retrieves the shared cookie from Azure Key Vault (via managed identity)
-3. Starts `pmd` as a systemd service with `discovery = ["azure-tag"]`
-4. The azure-tag plugin queries Azure Resource Graph for VMs with tag `pmd-cluster`
-5. All discovered peers connect automatically — no manual `pmd join` needed
+Each VM runs two processes:
+- **Node** — TypeScript API service (:8080) that communicates with the local PMD via Unix socket and with other nodes via the internal ring protocol (:9443, TCP, HMAC-authenticated)
+- **PMD** — portmapd daemon (:4369) handling membership, failure detection, and peer discovery via Azure Resource Graph
 
 ## Prerequisites
 
