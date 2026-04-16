@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-16
+
+### Added
+
+- **Phase 6 — Distributed State (Concordat WASM)**
+  - `concordat` WASM dependency for delta-state CRDT documents
+  - `ring.ts` — ring topology helpers (successor/predecessor computation)
+  - `state.ts` — `RingState` class wrapping `WasmCrdtDoc` with typed accessors
+  - Node registration (addNode/markLeaving/removeNode) with automatic ring recomputation
+  - Shared kv store (kvSet/kvGet/kvRemove) with CRDT merge semantics
+  - Delta sync API (deltaSince/mergeDelta/versionVector)
+
+- **Phase 7 — Node Discovery (PMD Polling)**
+  - `watcher.ts` — `NodeWatcher` class (EventEmitter) polling PMD socket for node changes
+  - Join/leave detection with diff-based comparison
+  - `currentPeers()` for listing non-local nodes
+
+- **Phase 8 — Internal Gossip Transport**
+  - `codec.ts` — binary frame codec (1B type + 4B length + payload), streaming decoder
+  - `auth.ts` — HMAC-SHA256 auth with timing-safe comparison, replay protection (±30s)
+  - `internal-server.ts` — TCP server (:9443) with AUTH handshake, PUSH/PULL/PING handlers
+  - `gossip.ts` — `GossipManager` with persistent connection pool, push-on-mutation, periodic pull, auto-reconnect with exponential backoff, PING/PONG keepalive
+
+- Azure Bastion for SSH access (no public IPs on VMs)
+- DNS label on LB public IP (`pmd-cluster-api.<region>.cloudapp.azure.com`)
+- 82 tests total (78 unit + 4 integration), all passing
+
+### Changed
+
+- Version bump 0.2.0 → 0.3.0
+- NSG: SSH restricted to Bastion subnet (10.0.2.0/26)
+- VMSS instances no longer have public IPs
+- Cloud-init deploys all source files (index.ts, app.ts, pmd-client.ts)
+- Architecture diagrams converted to Mermaid
+
+### Removed
+
+- `admin_ssh_cidr` variable (replaced by Bastion)
+- Public IP prefix for VMSS instances
+
 ## [0.2.0] - 2026-04-14
 
 ### Added

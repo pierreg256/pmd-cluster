@@ -96,6 +96,7 @@ graph TD
 | `src/ring.ts` | Ring topology — successor/predecessor computation |
 | `src/watcher.ts` | `NodeWatcher` — PMD polling, join/leave events |
 | `src/gossip.ts` | `GossipManager` — push-pull delta exchange |
+| `src/codec.ts` | Frame codec — length-prefixed binary encode/decode |
 | `src/auth.ts` | HMAC-SHA256 auth for internal transport |
 | `package.json` | Dependencies (incl. concordat), scripts, version |
 | `tsconfig.json` | TypeScript compiler config |
@@ -219,7 +220,7 @@ npm install concordat    # pre-built WASM from npm (wasm-pack --target nodejs)
 
 ---
 
-### Phase 7 — Node Discovery via PMD Polling
+### Phase 7 — Node Discovery via PMD Polling ✅
 
 Use the local PMD socket to discover nodes joining/leaving the cluster. The API already queries `Nodes` on-demand; this phase adds a **periodic poller** that feeds topology changes into the `RingState`.
 
@@ -256,13 +257,13 @@ export class NodeWatcher extends EventEmitter {
 4. On **leave**: emits `"leave"` event, calls `ringState.markLeaving(node_id)` which sets `status: "leaving"`, then after a grace period `ringState.removeNode(node_id)`.
 5. On every change: bumps `/meta/ring_version` and produces a delta for immediate gossip push.
 
-- [ ] Implement `NodeWatcher` class (`app/src/watcher.ts`)
+- [x] Implement `NodeWatcher` class (`app/src/watcher.ts`)
+- [x] Unit tests with mock socket returning varying node lists (join, leave, error, idempotency)
 - [ ] Wire watcher into `index.ts` lifecycle (start after server listen, stop on SIGTERM)
-- [ ] Unit tests with mock socket returning varying node lists
 
 ---
 
-### Phase 8 — Internal Gossip Transport
+### Phase 8 — Internal Gossip Transport ✅
 
 A dedicated internal server for node-to-node gossip, **separate from the public API**. Listens on port `:9443`, restricted to the VNet subnet via NSG, and authenticated with HMAC-SHA256 using the PMD cookie (already distributed via Key Vault).
 
@@ -412,15 +413,15 @@ export class GossipManager {
 | **Deduplication** | Version vector comparison | `deltaSince(remoteVV)` returns only missing ops |
 | **Auth** | HMAC-SHA256 (PMD cookie) | One handshake per connection |
 
-- [ ] Implement frame codec (encode/decode length-prefixed messages)
-- [ ] Implement AUTH handshake (`app/src/auth.ts`)
-- [ ] Implement `InternalServer` (`app/src/internal-server.ts`)
-- [ ] Implement `GossipManager` with connection pool (`app/src/gossip.ts`)
-- [ ] Implement push logic (serialize delta, send PUSH frame to peers)
-- [ ] Implement pull logic (periodic, pick random peers, send PULL frame)
-- [ ] Implement merge-on-receive (deserialize, `doc.merge()`)
-- [ ] PING/PONG keepalive
-- [ ] Unit tests with 3 in-memory replicas
+- [x] Implement frame codec (`app/src/codec.ts`) — encode/decode length-prefixed binary frames
+- [x] Implement AUTH handshake (`app/src/auth.ts`) — HMAC-SHA256 sign/verify with timing-safe comparison
+- [x] Implement `InternalServer` (`app/src/internal-server.ts`) — TCP server, auth, PUSH/PULL/PING handlers
+- [x] Implement `GossipManager` (`app/src/gossip.ts`) — connection pool, push-on-mutation, periodic pull, auto-reconnect
+- [x] Implement push logic (serialize delta, send PUSH frame to fan-out peers)
+- [x] Implement pull logic (periodic, pick random peers, send PULL frame)
+- [x] Implement merge-on-receive (deserialize, `doc.merge()`)
+- [x] PING/PONG keepalive (30s interval)
+- [x] Unit tests — codec (8), auth (13), internal server (6), gossip integration (4)
 - [ ] Add NSG rule for port 9443 (subnet-only) in `network.tf`
 
 ---
